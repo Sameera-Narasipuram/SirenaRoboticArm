@@ -23,4 +23,11 @@ class Frame {
         this.duration = 1.0d;
         this.pause = 0.0d;
     }
+
+    public Frame clone() {
+        Frame copy = new Frame(this.positions);
+        copy.duration = this.duration;
+        copy.pause = this.pause;
+        return copy;
+    }
 }

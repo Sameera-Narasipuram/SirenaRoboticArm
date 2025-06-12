@@ -15,4 +15,17 @@
     <string name="recordFrame">Record Frame</string>
 	<string name="saveAction">Save Action</string>
 	<string name="select">Select</string>
-</resources>
+    <string name="frame_button">Frame</string>
+    <string name="frame_button_desc">Frame Button</string>
+    <string name="duplicate_button_desc">Duplicate Frame</string>
+    <string name="delete_button_desc">Delete Frame</string>
+    <string-array name="motor_list">
+        <item>Motor 1</item>
+        <item>Motor 2</item>
+        <item>Motor 3</item>
+        <item>Motor 4</item>
+        <item>Motor 5</item>
+        <item>Gripper</item>
+    </string-array>
+    </resources>
+

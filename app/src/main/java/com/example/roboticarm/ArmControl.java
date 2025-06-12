@@ -7,6 +7,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
+import android.widget.Toast;
+import android.widget.TextView;
 
 public class ArmControl extends AppCompatActivity {
 
@@ -37,6 +39,7 @@ public class ArmControl extends AppCompatActivity {
     Button neutral4;
     Button neutral5;
     Button neutral6;
+    Button disconnectButton;
     int p1 = 150;
     int p2 = 150;
     int p3 = 150;
@@ -45,7 +48,18 @@ public class ArmControl extends AppCompatActivity {
     int p6 = 150;
     int resolution = 5;
     RobotCom robot = new RobotCom();
+    Robot robotArm = new Robot();
     int stepSize = 5;
+    TextView tv_motor1_angle;
+    TextView tv_motor2_angle;
+    TextView tv_motor3_angle;
+    TextView tv_motor4_angle;
+    TextView tv_motor5_angle;
+    TextView tv_motor6_angle;
+    int minProgress = 15;
+    int maxProgress = 285;
+    int minAngle = 15;
+    int maxAngle = 285;
 
     /* access modifiers changed from: protected */
     public void onCreate(Bundle savedInstanceState) {
@@ -75,6 +89,7 @@ public class ArmControl extends AppCompatActivity {
         this.motor4Inc = (ImageButton) findViewById(R.id.bt_motor4Inc);
         this.motor5Inc = (ImageButton) findViewById(R.id.bt_motor5Inc);
         this.motor6Inc = (ImageButton) findViewById(R.id.bt_motor6Inc);
+        this.disconnectButton = (Button) findViewById(R.id.bt_disconnect);
         this.ip = getIntent().getStringExtra("ip_add");
         this.robot.openTcp(this.ip);
         this.m1.setProgress(150);
@@ -84,12 +99,19 @@ public class ArmControl extends AppCompatActivity {
         this.m5.setProgress(150);
         this.m6.setProgress(150);
         this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{150.0d, 150.0d, 150.0d, 150.0d, 150.0d, 150.0d}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
+        this.tv_motor1_angle = (TextView) findViewById(R.id.tv_motor1_angle);
+        this.tv_motor2_angle = (TextView) findViewById(R.id.tv_motor2_angle);
+        this.tv_motor3_angle = (TextView) findViewById(R.id.tv_motor3_angle);
+        this.tv_motor4_angle = (TextView) findViewById(R.id.tv_motor4_angle);
+        this.tv_motor5_angle = (TextView) findViewById(R.id.tv_motor5_angle);
+        this.tv_motor6_angle = (TextView) findViewById(R.id.tv_motor6_angle);
         this.m1.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
-                Log.d("slider 1:", Integer.toString(progress2));
                 seekBar.setProgress(progress2);
                 ArmControl.this.p1 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor1_angle.setText(angle + "°");
                 ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
             }
 
@@ -102,9 +124,10 @@ public class ArmControl extends AppCompatActivity {
         this.m2.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
-                Log.d("slider 2:", Integer.toString(progress2));
                 seekBar.setProgress(progress2);
                 ArmControl.this.p2 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor2_angle.setText(angle + "°");
                 ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
             }
 
@@ -117,9 +140,10 @@ public class ArmControl extends AppCompatActivity {
         this.m3.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
-                Log.d("slider 3:", Integer.toString(progress2));
                 seekBar.setProgress(progress2);
                 ArmControl.this.p3 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor3_angle.setText(angle + "°");
                 ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
             }
 
@@ -132,9 +156,10 @@ public class ArmControl extends AppCompatActivity {
         this.m4.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
-                Log.d("slider 3:", Integer.toString(progress2));
                 seekBar.setProgress(progress2);
                 ArmControl.this.p4 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor4_angle.setText(angle + "°");
                 ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
             }
 
@@ -147,9 +172,10 @@ public class ArmControl extends AppCompatActivity {
         this.m5.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
-                Log.d("slider 5:", Integer.toString(progress2));
                 seekBar.setProgress(progress2);
                 ArmControl.this.p5 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor5_angle.setText(angle + "°");
                 ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
             }
 
@@ -164,6 +190,8 @@ public class ArmControl extends AppCompatActivity {
                 int progress2 = Math.round((float) (progress / ArmControl.this.stepSize)) * ArmControl.this.stepSize;
                 seekBar.setProgress(progress2);
                 ArmControl.this.p6 = progress2;
+                int angle = minAngle + ((progress2 - minProgress) * (maxAngle - minAngle)) / (maxProgress - minProgress);
+                ArmControl.this.tv_motor6_angle.setText(angle + "°");
                 if (progress2 > 150) {
                     ArmControl.this.robot.writeDegreesSyncAxMx(new byte[]{1, 2, 3, 4, 5, 6}, new byte[]{0, 0, 0, 0, 0, 0}, new double[]{(double) ArmControl.this.p1, (double) ArmControl.this.p2, (double) ArmControl.this.p3, (double) ArmControl.this.p4, (double) ArmControl.this.p5, (double) ArmControl.this.p6}, new double[]{10.0d, 10.0d, 10.0d, 10.0d, 10.0d, 10.0d}, 57142);
                 }
@@ -292,6 +320,43 @@ public class ArmControl extends AppCompatActivity {
             public void onClick(View view) {
                 if (ArmControl.this.m6.getProgress() > ArmControl.this.SliderMin) {
                     ArmControl.this.m6.setProgress(ArmControl.this.m6.getProgress() - ArmControl.this.resolution);
+                }
+            }
+        });
+        this.disconnectButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View view) {
+                p1 = 150;
+                p2 = 216;
+                p3 = 236;
+                p4 = 150;
+                p5 = 150;
+                p6 = 150;
+
+                m1.setProgress(150);
+                m2.setProgress(216);
+                m3.setProgress(236);
+                m4.setProgress(150);
+                m5.setProgress(150);
+                m6.setProgress(150);
+
+                robot.writeDegreesSyncAxMx(robotArm.IDs, robotArm.MotorTypes,
+                        new double[]{150.0d, 216.0d, 236.0d, 150.0d, 150.0d, 150.0d},
+                        new double[]{5.0d, 5.0d, 5.0d, 5.0d, 5.0d, 5.0d},
+                        57142);
+
+                try {
+                    Thread.sleep(3000);
+
+                    if (robot.mTcpClient != null) {
+                        robot.mTcpClient.stopClient();
+                    }
+
+                    Toast.makeText(ArmControl.this, "Robot safely moved to rest position and disconnected", Toast.LENGTH_SHORT).show();
+
+                    finish();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    Toast.makeText(ArmControl.this, "Error during disconnect", Toast.LENGTH_SHORT).show();
                 }
             }
         });

@@ -45,4 +45,5 @@ dependencies {
     androidTestImplementation libs.espresso.core
     implementation 'androidx.appcompat:appcompat:1.6.1'  // Use the latest stable version
     implementation 'androidx.core:core-ktx:1.10.1'        // For Kotlin extensions (optional)
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
 }

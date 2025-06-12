@@ -8,6 +8,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -29,6 +30,13 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
+import android.widget.ToggleButton;
+import android.widget.Switch;
+import androidx.appcompat.widget.SwitchCompat;
+import java.util.Stack;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ItemTouchHelper;
 
 public class RecordAndPlay extends AppCompatActivity {
     boolean New_Action_Created = false;
@@ -72,6 +80,12 @@ public class RecordAndPlay extends AppCompatActivity {
     int stepSize = 1;
     TextView tv_motorNum;
     TextView tv_title;
+    SwitchCompat toggleLoop;
+    boolean isLooping = false;
+    Stack<Frame> deletedFrames = new Stack<>();
+    Stack<Integer> deletedIndices = new Stack<>();
+    RecyclerView rvFrames;
+    FrameAdapter frameAdapter;
 
     /* access modifiers changed from: protected */
     @SuppressLint({"ClickableViewAccessibility"})
@@ -160,6 +174,129 @@ public class RecordAndPlay extends AppCompatActivity {
         findViewById(R.id.bt_motor4).setOnClickListener(this::onMotor4Click);
         findViewById(R.id.bt_motor5).setOnClickListener(this::onMotor5Click);
         findViewById(R.id.bt_gripper).setOnClickListener(this::onGripperClick);
+
+        Button disconnectButton = (Button) findViewById(R.id.bt_disconnect);
+        disconnectButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View view) {
+                // Set specific positions for safe disconnect
+                p1 = 150;
+                p2 = 216;
+                p3 = 236;
+                p4 = 150;
+                p5 = 150;
+                p6 = 150;
+
+                // Update motor angle if it's currently selected
+                motorAngle.setProgress(getSelectedMotorPosition());
+
+                // Send rest position command to robot
+                robot.writeDegreesSyncAxMx(RoboticArm.IDs, RoboticArm.MotorTypes,
+                        new double[]{150.0d, 216.0d, 236.0d, 150.0d, 150.0d, 150.0d},
+                        new double[]{5.0d, 5.0d, 5.0d, 5.0d, 5.0d, 5.0d},
+                        57142);
+
+                try {
+                    Thread.sleep(3000);
+
+                    if (robot.mTcpClient != null) {
+                        robot.mTcpClient.stopClient();
+                    }
+
+                    Toast.makeText(RecordAndPlay.this, "Robot safely moved to rest position and disconnected", Toast.LENGTH_SHORT).show();
+
+                    finish();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    Toast.makeText(RecordAndPlay.this, "Error during disconnect", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        Spinner spinnerMotors = findViewById(R.id.spinner_motors);
+
+        // List of motors and gripper
+        String[] motors = {"Motor 1", "Motor 2", "Motor 3", "Motor 4", "Motor 5", "Gripper"};
+
+        // Create an ArrayAdapter using the string array and a default spinner layout
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, motors);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        // Apply the adapter to the spinner
+        spinnerMotors.setAdapter(adapter);
+
+        // (Optional) Handle selection
+        spinnerMotors.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedMotor = motors[position];
+                // Do something with the selected motor/gripper
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // Optional: handle no selection
+            }
+        });
+
+        toggleLoop = findViewById(R.id.switch_loop);
+        toggleLoop.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isLooping = isChecked;
+            if (isChecked) {
+                Toast.makeText(this, "Loop ON", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Loop OFF", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        ImageButton bt_undo = findViewById(R.id.bt_undo);
+        bt_undo.setOnClickListener(v -> {
+            if (!deletedFrames.isEmpty() && !deletedIndices.isEmpty()) {
+                int restoreIndex = deletedIndices.pop();
+                Frame restoreFrame = deletedFrames.pop();
+                if (restoreIndex >= 0 && restoreIndex <= action.size()) {
+                    action.add(restoreIndex, restoreFrame);
+                    current_frame = action.size() - 1;
+                    update_scrollView_frames();
+                    Toast.makeText(this, "Undo: Frame restored", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(this, "Nothing to undo", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        rvFrames = findViewById(R.id.rv_frames);
+        rvFrames.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        frameAdapter = new FrameAdapter(action);
+        rvFrames.setAdapter(frameAdapter);
+
+        ItemTouchHelper.SimpleCallback callback = new ItemTouchHelper.SimpleCallback(ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT, 0) {
+            @Override
+            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
+                int from = viewHolder.getAdapterPosition();
+                int to = target.getAdapterPosition();
+                // Prevent moving neutral frames
+                if (from == 0 || from == action.size() - 1 || to == 0 || to == action.size() - 1) return false;
+                frameAdapter.moveItem(from, to);
+                return true;
+            }
+            @Override
+            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {}
+            @Override
+            public boolean isLongPressDragEnabled() { return true; }
+        };
+        new ItemTouchHelper(callback).attachToRecyclerView(rvFrames);
+    }
+
+    private int getSelectedMotorPosition() {
+        switch (selected_button) {
+            case 1: return p1;
+            case 2: return p2;
+            case 3: return p3;
+            case 4: return p4;
+            case 5: return p5;
+            case 6: return p6;
+            default: return 150;
+        }
     }
 
     // Separate click methods
@@ -416,9 +553,8 @@ public class RecordAndPlay extends AppCompatActivity {
                     textView.setText("title:" + RecordAndPlay.this.action_name);
                     RecordAndPlay.this.action.clear();
                     RecordAndPlay.this.action.add(new Frame(RecordAndPlay.this.RoboticArm.Neutral_Positions));
-                    RecordAndPlay.this.action.get(0).duration = 1.0d;
-                    RecordAndPlay.this.action.get(0).pause = 1.0d;
-                    RecordAndPlay.this.add_neutral_frame_to_scroll_view();
+                    RecordAndPlay.this.action.add(new Frame(RecordAndPlay.this.RoboticArm.Neutral_Positions));
+                    frameAdapter.notifyDataSetChanged();
                     RecordAndPlay.this.New_Action_Created = true;
                     Toast.makeText(RecordAndPlay.this, "New Action created", Toast.LENGTH_SHORT).show();
                 }
@@ -494,8 +630,8 @@ public class RecordAndPlay extends AppCompatActivity {
             tv_delay.setText("delay");
             final EditText et_delay = new EditText(this);
             et_delay.setText(String.valueOf(this.action.get(selected_frame).pause));
-            et_duration.setInputType(2);
-            et_delay.setInputType(2);
+            et_duration.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            et_delay.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
             layout.addView(tv_duration);
             layout.addView(et_duration);
             layout.addView(tv_delay);
@@ -507,6 +643,25 @@ public class RecordAndPlay extends AppCompatActivity {
                     RecordAndPlay.this.action.get(selected_frame).pause = Double.valueOf(et_delay.getText().toString()).doubleValue();
                 }
             });
+
+            // Add Delete and Duplicate buttons if it's not the neutral frame (frame 0)
+            if (selected_frame != 0) {
+                builder.setNegativeButton("Delete", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        deleteFrame(selected_frame);
+                    }
+                });
+                builder.setNeutralButton("Duplicate", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        Frame original = action.get(selected_frame);
+                        Frame copy = original.clone();
+                        action.add(selected_frame + 1, copy);
+                        update_scrollView_frames();
+                        Toast.makeText(RecordAndPlay.this, "Frame duplicated", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
             builder.show();
         } catch (Exception e) {
             Toast.makeText(this, "Record frame first", Toast.LENGTH_SHORT).show();
@@ -571,17 +726,17 @@ public class RecordAndPlay extends AppCompatActivity {
                 button.setTextColor(getColor(R.color.buttonTextColor));
                 this.linearLayout.addView(button);
             } else {
-                Button button2 = new Button(this);
-                button2.setText("frame " + Integer.toString(i));
-                button2.setId(this.current_frame);
-                button2.setBackground(getDrawable(R.drawable.framelist_button_background));
-                button2.setTextColor(getColor(R.color.buttonTextColor));
-                this.linearLayout.addView(button2);
-                button2.setOnClickListener(new View.OnClickListener() {
+                Button frameButton = new Button(this);
+                frameButton.setText("frame " + Integer.toString(i));
+                frameButton.setId(i);
+                frameButton.setBackground(getDrawable(R.drawable.framelist_button_background));
+                frameButton.setTextColor(getColor(R.color.buttonTextColor));
+                frameButton.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View view) {
                         RecordAndPlay.this.edit_frame(view);
                     }
                 });
+                this.linearLayout.addView(frameButton);
             }
         }
         this.New_Action_Created = true;
@@ -641,17 +796,19 @@ public class RecordAndPlay extends AppCompatActivity {
             Toast.makeText(this, "Create a new Action!", Toast.LENGTH_SHORT).show();
         } else if (this.Previous_Frame_Recorded) {
             this.current_frame++;
-            Button button = new Button(this);
-            button.setText("frame " + Integer.toString(this.current_frame));
-            button.setId(this.current_frame);
-            button.setBackground(getDrawable(R.drawable.framelist_button_background));
-            button.setTextColor(getColor(R.color.buttonTextColor));
-            button.setOnClickListener(new View.OnClickListener() {
+
+            Button frameButton = new Button(this);
+            frameButton.setText("frame " + Integer.toString(this.current_frame));
+            frameButton.setId(this.current_frame);
+            frameButton.setBackground(getDrawable(R.drawable.framelist_button_background));
+            frameButton.setTextColor(getColor(R.color.buttonTextColor));
+            frameButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View view) {
                     RecordAndPlay.this.edit_frame(view);
                 }
             });
-            this.linearLayout.addView(button);
+
+            this.linearLayout.addView(frameButton);
             this.scrollView.scrollTo(this.linearLayout.getRight(), 0);
             this.Previous_Frame_Recorded = false;
             Toast.makeText(this, "frame recorded", Toast.LENGTH_SHORT).show();
@@ -704,66 +861,67 @@ public class RecordAndPlay extends AppCompatActivity {
         private PlayActionTask() {
         }
 
-        /* access modifiers changed from: protected */
-        public Void doInBackground(Void... voids) {
-            int i;
-            double[] rpms = new double[RecordAndPlay.this.RoboticArm.NumberOfMotors];
-            boolean not_nuetral = false;
-            int j = 0;
-            while (true) {
-                i = 1;
-                if (j >= RecordAndPlay.this.RoboticArm.NumberOfMotors) {
-                    break;
-                }
-                if (RecordAndPlay.this.action.get(RecordAndPlay.this.action.size() - 1).positions[j] != 150.0d) {
-                    not_nuetral = true;
-                }
-                j++;
-            }
-            if (not_nuetral) {
-                double[] positions = RecordAndPlay.this.action.get(RecordAndPlay.this.action.size() - 1).positions;
-                for (int j2 = 0; j2 < RecordAndPlay.this.RoboticArm.NumberOfMotors; j2++) {
-                    double diff = Math.abs(RecordAndPlay.this.RoboticArm.Neutral_Positions[j2] - positions[j2]);
-                    if (RecordAndPlay.this.RoboticArm.MotorTypes[j2] == RecordAndPlay.this.RoboticArm.AX12 || RecordAndPlay.this.RoboticArm.MotorTypes[j2] == RecordAndPlay.this.RoboticArm.AX18) {
-                        rpms[j2] = (diff / 180.0d) / 0.03333333333333333d;
-                    } else {
-                        rpms[j2] = (diff / 360.0d) / 0.03333333333333333d;
-                    }
-                }
-                boolean z = not_nuetral;
-                double[] dArr = positions;
-                RecordAndPlay.this.robot.writeDegreesSyncAxMx(RecordAndPlay.this.RoboticArm.IDs, RecordAndPlay.this.RoboticArm.MotorTypes, RecordAndPlay.this.RoboticArm.Neutral_Positions, rpms, (long) RecordAndPlay.this.RoboticArm.Baudrate);
-                try {
-                    Thread.sleep((long) ((int) ((0.03333333333333333d + 0.03333333333333333d) * 60.0d * 1000.0d)));
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (RecordAndPlay.this.action.size() > 1) {
+        @Override
+        protected Void doInBackground(Void... voids) {
+            do {
+                int i;
+                double[] rpms = new double[RecordAndPlay.this.RoboticArm.NumberOfMotors];
+                boolean not_nuetral = false;
+                int j = 0;
                 while (true) {
-                    int i2 = i;
-                    if (i2 >= RecordAndPlay.this.action.size()) {
+                    i = 1;
+                    if (j >= RecordAndPlay.this.RoboticArm.NumberOfMotors) {
                         break;
                     }
-                    double dur = RecordAndPlay.this.action.get(i2).duration / 60.0d;
-                    double pau = RecordAndPlay.this.action.get(i2).pause / 60.0d;
-                    for (int j3 = 0; j3 < RecordAndPlay.this.RoboticArm.NumberOfMotors; j3++) {
-                        double diff2 = Math.abs(RecordAndPlay.this.action.get(i2).positions[j3] - RecordAndPlay.this.action.get(i2 - 1).positions[j3]);
-                        if (RecordAndPlay.this.RoboticArm.MotorTypes[j3] == RecordAndPlay.this.RoboticArm.AX12 || RecordAndPlay.this.RoboticArm.MotorTypes[j3] == RecordAndPlay.this.RoboticArm.AX18) {
-                            rpms[j3] = (diff2 / 180.0d) / dur;
+                    if (RecordAndPlay.this.action.get(RecordAndPlay.this.action.size() - 1).positions[j] != 150.0d) {
+                        not_nuetral = true;
+                    }
+                    j++;
+                }
+                if (not_nuetral) {
+                    double[] positions = RecordAndPlay.this.action.get(RecordAndPlay.this.action.size() - 1).positions;
+                    for (int j2 = 0; j2 < RecordAndPlay.this.RoboticArm.NumberOfMotors; j2++) {
+                        double diff = Math.abs(RecordAndPlay.this.RoboticArm.Neutral_Positions[j2] - positions[j2]);
+                        if (RecordAndPlay.this.RoboticArm.MotorTypes[j2] == RecordAndPlay.this.RoboticArm.AX12 || RecordAndPlay.this.RoboticArm.MotorTypes[j2] == RecordAndPlay.this.RoboticArm.AX18) {
+                            rpms[j2] = (diff / 180.0d) / 0.03333333333333333d;
                         } else {
-                            rpms[j3] = (diff2 / 360.0d) / dur;
+                            rpms[j2] = (diff / 360.0d) / 0.03333333333333333d;
                         }
                     }
-                    RecordAndPlay.this.robot.writeDegreesSyncAxMx(RecordAndPlay.this.RoboticArm.IDs, RecordAndPlay.this.RoboticArm.MotorTypes, RecordAndPlay.this.action.get(i2).positions, rpms, (long) RecordAndPlay.this.RoboticArm.Baudrate);
+                    RecordAndPlay.this.robot.writeDegreesSyncAxMx(RecordAndPlay.this.RoboticArm.IDs, RecordAndPlay.this.RoboticArm.MotorTypes, RecordAndPlay.this.RoboticArm.Neutral_Positions, rpms, (long) RecordAndPlay.this.RoboticArm.Baudrate);
                     try {
-                        Thread.sleep((long) ((int) ((dur + pau) * 60.0d * 1000.0d)));
-                    } catch (InterruptedException e2) {
-                        e2.printStackTrace();
+                        Thread.sleep((long) ((int) ((0.03333333333333333d + 0.03333333333333333d) * 60.0d * 1000.0d)));
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
-                    i = i2 + 1;
                 }
-            }
+                if (RecordAndPlay.this.action.size() > 1) {
+                    while (true) {
+                        int i2 = i;
+                        if (i2 >= RecordAndPlay.this.action.size()) {
+                            break;
+                        }
+                        double dur = RecordAndPlay.this.action.get(i2).duration / 60.0d;
+                        double pau = RecordAndPlay.this.action.get(i2).pause / 60.0d;
+                        for (int j3 = 0; j3 < RecordAndPlay.this.RoboticArm.NumberOfMotors; j3++) {
+                            double diff2 = Math.abs(RecordAndPlay.this.action.get(i2).positions[j3] - RecordAndPlay.this.action.get(i2 - 1).positions[j3]);
+                            if (RecordAndPlay.this.RoboticArm.MotorTypes[j3] == RecordAndPlay.this.RoboticArm.AX12 || RecordAndPlay.this.RoboticArm.MotorTypes[j3] == RecordAndPlay.this.RoboticArm.AX18) {
+                                rpms[j3] = (diff2 / 180.0d) / dur;
+                            } else {
+                                rpms[j3] = (diff2 / 360.0d) / dur;
+                            }
+                        }
+                        RecordAndPlay.this.robot.writeDegreesSyncAxMx(RecordAndPlay.this.RoboticArm.IDs, RecordAndPlay.this.RoboticArm.MotorTypes, RecordAndPlay.this.action.get(i2).positions, rpms, (long) RecordAndPlay.this.RoboticArm.Baudrate);
+                        try {
+                            Thread.sleep((long) ((int) ((dur + pau) * 60.0d * 1000.0d)));
+                        } catch (InterruptedException e2) {
+                            e2.printStackTrace();
+                        }
+                        i = i2 + 1;
+                    }
+                }
+                // End of one playthrough
+            } while (isLooping && playing);
             RecordAndPlay.this.playing = false;
             return null;
         }
@@ -779,4 +937,53 @@ public class RecordAndPlay extends AppCompatActivity {
         this.New_Action_Created = false;
         Toast.makeText(this, "Frame list cleared", Toast.LENGTH_SHORT).show();
     }
-}
+
+    public void deleteFrame(int frameIndex) {
+        if (frameIndex >= 0 && frameIndex < action.size()) {
+            deletedFrames.push(action.get(frameIndex).clone());
+            deletedIndices.push(frameIndex);
+            action.remove(frameIndex);
+            current_frame--;
+            update_scrollView_frames();
+            Toast.makeText(this, "Frame deleted", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private class FrameAdapter extends RecyclerView.Adapter<FrameAdapter.FrameViewHolder> {
+        private List<Frame> frames;
+        public FrameAdapter(List<Frame> frames) { this.frames = frames; }
+        @Override
+        public FrameViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            Button btn = new Button(parent.getContext());
+            btn.setLayoutParams(new RecyclerView.LayoutParams(120, 60));
+            btn.setBackground(getDrawable(R.drawable.framelist_button_background));
+            btn.setTextColor(getColor(R.color.buttonTextColor));
+            btn.setTextSize(10);
+            return new FrameViewHolder(btn);
+        }
+        @Override
+        public void onBindViewHolder(FrameViewHolder holder, int position) {
+            if (position == 0 || position == frames.size() - 1) {
+                holder.button.setText("N");
+            } else {
+                holder.button.setText("frame " + position);
+            }
+            holder.button.setOnClickListener(v -> edit_frame(holder.getAdapterPosition()));
+        }
+        @Override
+        public int getItemCount() { return frames.size(); }
+        class FrameViewHolder extends RecyclerView.ViewHolder {
+            Button button;
+            FrameViewHolder(View itemView) {
+                super(itemView);
+                button = (Button) itemView;
+            }
+        }
+        public void moveItem(int from, int to) {
+            if (from == 0 || from == frames.size() - 1 || to == 0 || to == frames.size() - 1) return;
+            Frame moved = frames.remove(from);
+            frames.add(to, moved);
+            notifyItemMoved(from, to);
+        }
+    }
+} 
